@@ -16,6 +16,7 @@ const DAY = 864e5, LS = 'sp_jobs_v1';
 let jobs = {}, open = null, firstSnap = true, useGS = false, dirty = {}, lastRaw = '';
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+let view = 'jobs', dip = null;
 let user = null, users = [], pin = lsGet('sp_pin') || '';
 try { user = JSON.parse(lsGet('sp_user') || 'null'); } catch (e) { user = null; }
 let role = user ? user.role : 'worker';
@@ -67,8 +68,9 @@ function applyRemote(v, merge) {
   if (merge) {
     Object.keys(dirty).forEach(id => { if (dirty[id].startsWith('save') && jobs[id]) v[id] = jobs[id]; else if (dirty[id].startsWith('del')) delete v[id]; });
   }
+  const u0 = role === 'admin' ? unread() : 0;
   jobs = v; store(); render();
-  if (!firstSnap && role === 'admin') Object.values(v).filter(x => x.issue && !seen.has(x.id + x.issue.at)).forEach(x => { toast('🚩 ' + x.title + ': ' + x.issue.cat); if (navigator.vibrate) navigator.vibrate(200); });
+  if (!firstSnap && role === 'admin' && unread() > u0) alertNew(inboxItems()[0]);
   firstSnap = false;
 }
 const gsPost = body => fetch(APPS_SCRIPT_URL, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({pin: pin}, body))})
@@ -151,12 +153,12 @@ function A_saveDetails(id) { const j = jobs[id]; readForm(j); save(j); toast('De
 function A_issue(id) {
   const j = jobs[id], note = $('inote').value.trim();
   j.issue = {cat: $('icat').value, note, by: myName(), uid: user.id, at: now(), step: j.step, comments: []};
-  save(j); M.job(id); toast('Issue flagged');
+  save(j); M.job(id); toast('Issue sent to Admin ✓');
 }
 function A_note(id) {
   const j = jobs[id], t = $('ntx').value.trim(); if (!t) return toast('Write a message');
   j.notes.push({id: uid(), uid: user.id, by: myName(), kind: $('nk').value, text: t, at: now()});
-  save(j); M.job(id); toast('Sent to Admin only');
+  save(j); M.job(id); toast('Sent ✓ Admin has been notified');
 }
 function A_memo(id) { if (role !== 'admin') return; const j = jobs[id]; j.memo = $('memo').value.trim(); save(j); toast('Memo saved'); }
 function A_assign(id, i, v) {
@@ -236,6 +238,7 @@ const FS_ADMIN = $('fS').innerHTML;
 function showLogin(msg, init) {
   $('login').classList.remove('hidden');
   $('lbox').innerHTML = '<div class="text-center mb-4"><div class="w-14 h-14 rounded-xl bg-em text-white font-bold text-xl flex items-center justify-center mx-auto mb-2">SP</div><div class="font-bold text-em-dark">SP Home Construction (Pvt) Ltd</div><div class="text-xs text-slate-500">Workshop Tracker - ' + (APP_ROLE === 'admin' ? 'Admin' : 'Worker') + '</div></div>' +
+    (/iPhone|iPad/.test(navigator.userAgent) && !navigator.standalone ? '<div class="text-xs text-slate-500 mb-2">Tip: tap Share, then <b>Add to Home Screen</b> to install this app.</div>' : '') +
     (msg ? '<div class="text-sm text-red-600 mb-2">' + esc(msg) + '</div>' : '') +
     (init === true ? '<div class="text-sm mb-2">First time setup: create the Admin account.</div><label class="lbl">Admin name</label><input id="ln" class="inp">' : '') +
     (init === undefined ? '' : '<label class="lbl">PIN (4-8 digits)</label><input id="lp" type="password" inputmode="numeric" maxlength="8" autocomplete="off" class="inp text-center text-xl tracking-widest" onkeydown="if(event.key===\'Enter\')A_login(' + (init === true) + ')"><button class="btn bg-em text-white w-full mt-4" onclick="A_login(' + (init === true) + ')">' + (init === true ? 'Create Admin' : 'Log in') + '</button>');
@@ -308,6 +311,41 @@ function A_poWa(id, k) {
   if (!window.open('https://wa.me/' + p.phone + '?text=' + encodeURIComponent(L.join('\n')), '_blank')) toast('Allow pop-ups to open WhatsApp');
 }
 function A_poDel(id, k) { if (role !== 'admin' || !confirm('Delete this purchase order?')) return; const j = jobs[id]; j.pos.splice(k, 1); save(j); M.job(id); }
+
+const seen = () => lsGet('sp_seen') || '';
+function inboxItems() {
+  const o = [];
+  Object.values(jobs).forEach(j => { j.notes.forEach(n => o.push({t: n.at, kind: n.kind, by: n.by, text: n.text, j})); if (j.issue) o.push({t: j.issue.at, kind: 'Issue: ' + j.issue.cat, by: j.issue.by, text: j.issue.note, j, issue: true}); });
+  return o.sort((x, y) => String(y.t).localeCompare(String(x.t)));
+}
+const unread = () => inboxItems().filter(x => String(x.t) > seen()).length;
+function alertNew(x) {
+  if (!x) return;
+  toast('🔔 ' + x.by + ': ' + x.kind + ' - ' + x.j.title);
+  if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+  if (window.Notification && Notification.permission === 'granted') { try { new Notification('SP Workshop: ' + x.kind, {body: x.by + ' - ' + x.j.title + ': ' + x.text, icon: 'icon-admin-192.png'}); } catch (e) {} }
+}
+function inboxHtml() {
+  const s0 = seen(), items = inboxItems();
+  if (items.length) lsSet('sp_seen', items[0].t);
+  const bell = window.Notification && Notification.permission === 'default' ? '<button class="btn bg-em text-white w-full mb-3" onclick="Notification.requestPermission().then(render)">🔔 Turn on alerts on this phone</button>' : '';
+  return '<div class="col-span-full md:col-span-2 lg:col-span-3">' + bell + (items.length ? items.map(x => { const nw = String(x.t) > s0; return `<button onclick="M.job('${x.j.id}')" class="card w-full text-left p-4 mb-3 border-l-[6px] ${x.issue ? 'border-red-500' : 'border-amber-400'} ${nw ? 'ring-2 ring-em/40' : ''}"><div class="flex items-center gap-2"><b class="flex-1 truncate">${esc(x.kind)}</b>${nw ? '<span class="text-[10px] font-bold bg-red-600 text-white rounded px-1.5">NEW</span>' : ''}<span class="text-xs text-slate-500">${fdt(x.t)}</span></div><div class="text-sm mt-1">${esc(x.text || '(no details)')}</div><div class="text-xs text-slate-500 mt-1">${esc(x.by)} - ${esc(x.j.title)} (${esc(x.j.client)})</div></button>`; }).join('') : '<div class="text-center text-slate-500 py-12">No messages yet. Delay reasons, issues and notes from workers appear here.</div>') + '</div>';
+}
+function setView(v) { view = v; render(); window.scrollTo(0, 0); }
+function setW(v) { $('fS').value = v; render(); window.scrollTo(0, 0); }
+function renderNav() {
+  const admin = role === 'admin', n = admin ? unread() : 0, wv = $('fS').value;
+  const tabs = admin ? [['jobs', 'Jobs', 'clipboard-list', 0, "setView('jobs')"], ['inbox', 'Inbox', 'bell', n, "setView('inbox')"], ['team', 'Team', 'users', 0, 'M.team()']] : [['mine', 'My tasks', 'hammer', 0, "setW('mine')"], ['arch', 'Archive', 'archive', 0, "setW('arch')"]];
+  $('nav').innerHTML = tabs.map(t => `<button onclick="${t[4]}" class="flex-1 flex flex-col items-center gap-0.5 pt-2 pb-1.5 relative ${(admin ? view === t[0] : wv === t[0]) ? 'text-em' : 'text-slate-500'}"><i data-lucide="${t[2]}" class="w-6 h-6"></i><span class="text-[11px] font-semibold">${t[1]}</span>${t[3] ? `<span class="absolute top-1 left-1/2 ml-2 bg-red-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center">${t[3]}</span>` : ''}</button>`).join('');
+  if (navigator.setAppBadge) { try { n ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } catch (e) {} }
+}
+function workerHero(all) {
+  if ($('fS').value === 'arch') return '';
+  return all.filter(j => !j.done && !j.issue && j.steps[j.step].uid === user.id).map(j => `<button onclick="M.job('${j.id}')" class="w-full text-left rounded-2xl p-4 mb-3 text-white shadow-lg" style="background:linear-gradient(135deg,#059669,#047857)"><div class="text-xs opacity-80">👉 YOUR TURN</div><div class="text-lg font-bold">${esc(j.title)}</div><div class="text-sm opacity-90">${esc(STEPS[j.step].n)} - ${esc(j.client)}</div><div class="mt-3 bg-white text-em-dark font-bold rounded-xl py-3 text-center">${j.steps[j.step].state === 'IN_PROGRESS' ? 'Continue task' : 'Open &amp; start'}</div></button>`).join('');
+}
+const ONBOARD = '<div class="card p-5 text-left max-w-md mx-auto text-slate-700"><div class="font-bold text-em-dark mb-2">Welcome! Get started in 3 steps</div><div class="mb-2">1. Tap <b>Team</b> and add each worker with their own PIN.</div><div class="mb-2">2. Tap <b>+ New job</b> and assign a person to every step.</div><div>3. Send workers the link ending in <b>worker.html</b>.</div></div>';
+const WEMPTY = '<div class="card p-5 max-w-md mx-auto text-slate-700">No tasks here yet. When Admin assigns you a job it appears automatically. Tap the green dot at the top to refresh.</div>';
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); dip = e; const b = $('inst'); if (b) b.classList.remove('hidden'); });
 
 /* ---------- Modals---------- */
 const M = {
@@ -384,14 +422,20 @@ M.team = () => M.show(M.head('Team & PINs') + '<div class="p-4">' + users.filter
 /* ---------- Rendering ---------- */
 function render() {
   if (!user) return;
+  const inbox = role === 'admin' && view === 'inbox';
+  ['metrics', 'alerts', 'fbar'].forEach(id => $(id).classList.toggle('hidden', inbox));
+  $('fS').classList.toggle('hidden', role !== 'admin');
   $('who').textContent = user.name + ' - ' + role;
   const all = Object.values(jobs).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   const cnt = {active: all.filter(j => !j.done).length, done: all.filter(j => j.done).length, issue: all.filter(j => j.issue).length, delayed: all.filter(isDelayed).length};
   const admin = role === 'admin';
+  { const h = new Date().getHours(), n = admin ? unread() : 0, w = all.filter(j => !j.done && !j.issue && j.steps[j.step].uid === user.id).length;
+    $('hello').innerHTML = '<div class="text-2xl font-bold text-em-dark">' + (h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening') + ', ' + esc(user.name.split(' ')[0]) + '</div><div class="text-sm text-slate-500">' +
+      (admin ? cnt.active + ' active job' + (cnt.active === 1 ? '' : 's') + (n ? ' - <button class="text-red-600 font-bold underline" onclick="setView(\'inbox\')">' + n + ' new message' + (n === 1 ? '' : 's') + '</button>' : '') : (w ? w + ' task' + (w === 1 ? '' : 's') + ' waiting for you' : 'Nothing waiting for you right now')) + '</div>'; }
   $('metrics').innerHTML = admin ? [['Active jobs', cnt.active, 'text-em-dark', 'hammer'], ['Completed', cnt.done, 'text-char', 'check-circle'], ['Issues pending', cnt.issue, 'text-red-600', 'flag'], ['Delayed (>24h)', cnt.delayed, 'text-amber-600', 'clock']]
     .map(m => `<div class="card p-3"><div class="flex justify-between text-xs text-slate-500">${m[0]}<i data-lucide="${m[3]}" class="w-4 h-4"></i></div><div class="text-3xl font-bold ${m[2]}">${m[1]}</div></div>`).join('') : workerMetrics(all);
   const iss = admin ? all.filter(j => j.issue) : [];
-  $('alerts').innerHTML = iss.length ? `<div class="bg-red-50 border border-red-300 rounded-xl p-3"><div class="font-bold text-red-700 mb-1">Issue alerts (${iss.length})</div>${iss.map(j => `<button onclick="M.job('${j.id}')" class="w-full text-left text-sm py-2 border-t border-red-200 flex gap-2"><span class="font-semibold">${esc(j.title)}</span><span class="text-red-700">${esc(j.issue.cat)}</span><span class="ml-auto text-xs text-slate-500">${esc(j.issue.by)}, ${fdt(j.issue.at)}</span></button>`).join('')}</div>` : '';
+  $('alerts').innerHTML = !admin ? workerHero(all) : iss.length ? `<div class="bg-red-50 border border-red-300 rounded-xl p-3"><div class="font-bold text-red-700 mb-1">Issue alerts (${iss.length})</div>${iss.map(j => `<button onclick="M.job('${j.id}')" class="w-full text-left text-sm py-2 border-t border-red-200 flex gap-2"><span class="font-semibold">${esc(j.title)}</span><span class="text-red-700">${esc(j.issue.cat)}</span><span class="ml-auto text-xs text-slate-500">${esc(j.issue.by)}, ${fdt(j.issue.at)}</span></button>`).join('')}</div>` : '';
   const fd = $('fD'), fv = fd.value || 'all';
   if (!fd.options.length) fd.innerHTML = '<option value="all">All departments</option>' + STEPS.map((s, i) => `<option value="${i}">${s.dept}</option>`).join('');
   fd.value = fv;
@@ -401,7 +445,7 @@ function render() {
   const q = $('fQ').value.toLowerCase(), fs = admin ? $('fS').value : 'all';
   const list = (admin ? all : all.filter(j => wFilter(j, $('fS').value))).filter(j => (fs === 'all' || (fs === 'active' ? !j.done : fs === 'done' ? j.done : status(j) === fs || (fs === 'delayed' && isDelayed(j)))) &&
     (fv === 'all' || (!j.done && j.step === +fv)) && (j.title + j.client).toLowerCase().includes(q));
-  $('list').innerHTML = list.length ? list.map(j => {
+  $('list').innerHTML = inbox ? inboxHtml() : list.length ? list.map(j => {
     const s = j.steps[j.step], red = !!j.issue, d = isDelayed(j) && (admin || s.uid === user.id);
     return `<button onclick="M.job('${j.id}')" class="card text-left p-4 border-l-[6px] ${red ? 'border-red-500 pulse-red' : d ? 'border-amber-500' : j.done ? 'border-emerald-300' : 'border-em'}">
     <div class="flex items-start gap-2"><div class="flex-1 min-w-0"><div class="font-bold truncate">${esc(j.title)}</div><div class="text-xs text-slate-500 truncate">${esc(j.client)} - ${j.id}</div></div>
@@ -409,8 +453,8 @@ function render() {
     <div class="flex gap-1 my-2">${j.steps.map(x => `<div class="h-1.5 flex-1 rounded ${x.state === 'DONE' ? 'bg-em' : x.state === 'IN_PROGRESS' ? 'bg-em/50' : x.state === 'PENDING_TAKEOVER' ? 'bg-amber-400' : 'bg-slate-200'}"></div>`).join('')}</div>
     <div class="text-sm">${j.done ? 'All 6 steps complete' : `Step ${j.step + 1}: ${STEPS[j.step].n}`}</div>
     <div class="text-xs text-slate-500">${j.done ? '' : SL[s.state] + (s.worker ? ' - ' + esc(s.worker) : s.an ? ' - ' + esc(s.an) : '')}</div>${red ? `<div class="text-xs text-red-700 font-semibold mt-1">${esc(j.issue.cat)}</div>` : ''}</button>`;
-  }).join('') : '<div class="col-span-full text-center text-slate-500 py-12">' + (admin ? 'No jobs match. Tap New job to start one.' : 'No tasks here.') + '</div>';
-  icons();
+  }).join('') : '<div class="col-span-full text-center text-slate-500 py-12">' + (admin ? (Object.keys(jobs).length ? 'No jobs match your filters.' : ONBOARD) : WEMPTY) + '</div>';
+  renderNav(); icons();
   if (open && !jobs[open]) M.close();
   else if (open && !(document.activeElement && $('mbody').contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) {
     const keep = [...document.querySelectorAll('#mbody [data-k],#memo,#cmt')].map(e => [e.dataset.k ? '[data-k="' + e.dataset.k + '"]' : '#' + e.id, e.value]);

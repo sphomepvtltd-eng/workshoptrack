@@ -18,3 +18,12 @@ sw.js, manifest-admin.json, manifest-worker.json, icon-admin-*.png, icon-worker-
 Open admin.html: create the Admin name + PIN. Admin > Team > add each worker with their own PIN.
 Create jobs, assign a person per step. Per job (Admin): Print job card, WhatsApp status, Purchase orders (print/PDF or WhatsApp to supplier), private memo.
 Lost Admin PIN: run `resetAdminPin` in the Apps Script editor (PIN becomes 0000).
+
+## Notifications
+When a worker sends a message, flags an issue or finishes a job, Admin also gets an **email** (to the Google account that owns the script), so it reaches your phone even when the app is closed. After updating Code.gs: run `setup` again and allow the new email permission, then Deploy > Manage deployments > Edit > New version.
+Inside the app: Inbox tab with a red badge (also on the home-screen icon where supported). Open Inbox once and tap "Turn on alerts" for pop-ups while the app is open.
+
+## WhatsApp alerts to Admin (optional, free via CallMeBot)
+1. On the Admin phone (0778060860) follow https://www.callmebot.com/blog/free-api-whatsapp-messages/ : save the CallMeBot contact shown there and send it the activation message. It replies with an API key.
+2. Apps Script > Project Settings > Script properties > Add `CALLMEBOT_KEY` = that key (optional `ADMIN_WHATSAPP` = +94778060860).
+3. Run `testNotify` in the editor to test, then Deploy > Manage deployments > Edit > New version.

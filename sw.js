@@ -1,4 +1,4 @@
-const C = 'sp-v7';
+const C = 'sp-v8';
 const CORE = ['./', './admin.html', './worker.html', './app.js', './config.js', './manifest-admin.json', './manifest-worker.json', './icon-admin-192.png', './icon-admin-512.png', './icon-worker-192.png', './icon-worker-512.png'];
 const CDN = ['https://cdn.tailwindcss.com', 'https://unpkg.com/lucide@0.441.0/dist/umd/lucide.min.js'];
 self.addEventListener('install', e => {
