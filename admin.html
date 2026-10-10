@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SP Workshop Admin</title>
+<meta name="theme-color" content="#064e3b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SP Admin">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon-admin-180.png">
+<link rel="manifest" href="manifest-admin.json">
+<link rel="icon" href="icon-admin-192.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{colors:{em:{DEFAULT:'#059669',dark:'#064e3b'},char:'#1f2937'}}}}</script>
+<script src="https://unpkg.com/lucide@0.441.0/dist/umd/lucide.min.js"></script>
+<style>
+html,body{background:#eef2f1;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+body{padding-bottom:calc(6rem + env(safe-area-inset-bottom))}
+.hd{background:linear-gradient(135deg,#064e3b,#047857);padding-top:env(safe-area-inset-top)}
+header.hd{border-radius:0 0 1.25rem 1.25rem}
+.card{background:#fff;border-radius:1rem;box-shadow:0 1px 2px rgba(0,0,0,.05),0 6px 18px rgba(6,78,59,.08)}
+.inp{width:100%;border:1.5px solid #d5dde3;border-radius:.75rem;padding:.7rem .85rem;font-size:16px;background:#fff}
+.inp:focus{outline:3px solid rgba(5,150,105,.25);border-color:#059669}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;border-radius:.85rem;padding:.65rem 1rem;font-weight:600;font-size:.95rem;min-height:48px}
+.btn:active{transform:scale(.98)}.btn:disabled{opacity:.45}
+.lbl{font-size:.78rem;font-weight:600;color:#475569;margin:.7rem 0 .25rem;display:block}
+#mbody>div.p-4{display:grid;gap:1rem}
+@media (prefers-reduced-motion:no-preference){.pulse-red{animation:pr 1.6s infinite}@keyframes pr{50%{box-shadow:0 0 0 6px rgba(220,38,38,.15)}}}
+</style>
+</head>
+<body class="text-char">
+<header class="hd text-white sticky top-0 z-30 shadow-lg">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div class="w-10 h-10 rounded-lg bg-em flex items-center justify-center font-bold">SP</div>
+    <div class="flex-1 min-w-0">
+      <div class="font-bold leading-tight truncate">SP Home Construction (Pvt) Ltd</div>
+      <div class="text-xs text-emerald-200 flex items-center gap-1"><b class="uppercase tracking-wide bg-white/15 rounded px-1.5">Admin</b><span id="sync" class="inline-block w-2 h-2 rounded-full bg-amber-400"></span><span id="syncTxt">Local only</span></div>
+    </div>
+    <div class="flex items-center gap-2 text-sm"><button id="bTeam" class="hidden bg-black/25 rounded-lg px-3 py-2 font-semibold" onclick="M.team()">Team</button><div class="text-right leading-tight"><div id="who" class="text-xs font-semibold"></div><button class="text-xs underline text-emerald-200" onclick="doLogout()">Log out</button></div></div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 pt-5">
+  <div id="metrics" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"></div>
+  <div id="alerts" class="mb-4"></div>
+  <div class="flex flex-wrap gap-2 items-center mb-3">
+    <select id="fS" class="inp !w-auto" onchange="render()">
+      <option value="all">All statuses</option><option value="active">Active</option><option value="issue">Issue flagged</option><option value="delayed">Delayed (&gt;24h)</option><option value="done">Completed</option>
+    </select>
+    <select id="fD" class="inp !w-auto" onchange="render()"></select>
+    <input id="fQ" class="inp !w-auto flex-1 min-w-[140px]" placeholder="Search client or item" oninput="render()">
+    <button id="bNew" style="bottom:calc(1.25rem + env(safe-area-inset-bottom))" class="btn bg-em text-white shadow-xl hidden fixed right-4 z-30 rounded-full px-5" onclick="M.newJob()"><i data-lucide="plus" class="w-4 h-4"></i>New job</button>
+  </div>
+  <div id="list" class="grid gap-3 md:grid-cols-2 lg:grid-cols-3"></div>
+</main>
+
+<div id="login" class="fixed inset-0 z-[60] hd flex items-center justify-center p-6"><div id="lbox" class="card p-6 w-full max-w-sm"></div></div>
+<div id="modal" role="dialog" aria-modal="true" class="fixed inset-0 z-40 hidden bg-black/60 items-end md:items-center justify-center" onclick="if(event.target===this)M.close()">
+  <div id="mbody" class="bg-white w-full md:max-w-3xl max-h-[92vh] overflow-y-auto rounded-t-3xl md:rounded-2xl"></div>
+</div>
+<div id="toast" role="status" aria-live="polite" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-char text-white text-sm px-4 py-2 rounded-lg hidden"></div>
+
+<script>const APP_ROLE = 'admin';</script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
